@@ -52,6 +52,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "custom_string": {
+          "type": "string",
+          "description": "implements custom schema"
+        },
         "feeling": {
           "oneOf": [
             {

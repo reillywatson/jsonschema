@@ -54,6 +54,7 @@
         },
         "custom_string": {
           "type": "string",
+          "title": "Custom title",
           "description": "implements custom schema"
         },
         "feeling": {

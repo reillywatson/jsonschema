@@ -105,6 +105,10 @@ type Reflector struct {
 	// switching to just allowing additional properties instead.
 	IgnoredTypes []interface{}
 
+	// SchemaContext defines a custom piece of data that can be passed to any types
+	// that implement the CustomSchema interface.
+	SchemaContext interface{}
+
 	// TypeMapper is a function that can be used to map custom Go types to jsconschema types.
 	TypeMapper func(reflect.Type) *Type
 }
@@ -179,8 +183,8 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 	}
 
 	if r.TypeMapper != nil {
-		if t := r.TypeMapper(t); t != nil {
-			return t
+		if result := r.TypeMapper(t); result != nil {
+			return r.customize(t, result)
 		}
 	}
 
@@ -202,7 +206,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 		case uriType: // uri RFC section 7.3.6
 			return &Type{Type: "string", Format: "uri"}
 		default:
-			return r.reflectStruct(definitions, t)
+			return r.customize(t, r.reflectStruct(definitions, t))
 		}
 
 	case reflect.Map:
@@ -213,7 +217,7 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 			},
 		}
 		delete(rt.PatternProperties, "additionalProperties")
-		return rt
+		return r.customize(t, rt)
 
 	case reflect.Slice, reflect.Array:
 		returnType := &Type{}
@@ -225,11 +229,11 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 		case byteSliceType:
 			returnType.Type = "string"
 			returnType.Media = &Type{BinaryEncoding: "base64"}
-			return returnType
+			return r.customize(t, returnType)
 		default:
 			returnType.Type = "array"
 			returnType.Items = r.reflectTypeToSchema(definitions, t.Elem())
-			return returnType
+			return r.customize(t, returnType)
 		}
 
 	case reflect.Interface:
@@ -240,21 +244,37 @@ func (r *Reflector) reflectTypeToSchema(definitions Definitions, t reflect.Type)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return &Type{Type: "integer"}
+		return r.customize(t, &Type{Type: "integer"})
 
 	case reflect.Float32, reflect.Float64:
-		return &Type{Type: "number"}
+		return r.customize(t, &Type{Type: "number"})
 
 	case reflect.Bool:
-		return &Type{Type: "boolean"}
+		return r.customize(t, &Type{Type: "boolean"})
 
 	case reflect.String:
-		return &Type{Type: "string"}
+		return r.customize(t, &Type{Type: "string"})
 
 	case reflect.Ptr:
-		return r.reflectTypeToSchema(definitions, t.Elem())
+		return r.customize(t, r.reflectTypeToSchema(definitions, t.Elem()))
 	}
 	panic("unsupported type " + t.String())
+}
+
+type CustomSchema interface {
+	CustomizeJSONSchema(schema *Type, customData interface{})
+}
+
+var customSchemaType = reflect.TypeOf((*CustomSchema)(nil)).Elem()
+
+func (r *Reflector) customize(t reflect.Type, schema *Type) *Type {
+	if t.Implements(customSchemaType) {
+		if v, ok := reflect.New(t).Interface().(CustomSchema); ok {
+			v.CustomizeJSONSchema(schema, r.SchemaContext)
+		}
+
+	}
+	return schema
 }
 
 // Refects a struct to a JSON Schema type.

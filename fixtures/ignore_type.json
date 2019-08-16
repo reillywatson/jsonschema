@@ -41,6 +41,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "custom_string": {
+          "type": "string",
+          "description": "implements custom schema"
+        },
         "email": {
           "type": "string",
           "format": "email"

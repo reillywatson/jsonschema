@@ -54,10 +54,11 @@ type TestUser struct {
 	nonExported
 	MapType
 
-	ID      int                    `json:"id" jsonschema:"required"`
-	Name    string                 `json:"name" jsonschema:"required,minLength=1,maxLength=20,pattern=.*,description=this is a property,title=the name,example=joe,example=lucy,default=alex"`
-	Friends []int                  `json:"friends,omitempty" jsonschema_description:"list of IDs, omitted when empty"`
-	Tags    map[string]interface{} `json:"tags,omitempty"`
+	ID           int                    `json:"id" jsonschema:"required"`
+	Name         string                 `json:"name" jsonschema:"required,minLength=1,maxLength=20,pattern=.*,description=this is a property,title=the name,example=joe,example=lucy,default=alex"`
+	Friends      []int                  `json:"friends,omitempty" jsonschema_description:"list of IDs, omitted when empty"`
+	Tags         map[string]interface{} `json:"tags,omitempty"`
+	CustomString CustomString           `json:"custom_string,omitempty" jsonschema_description:"implements custom schema"`
 
 	TestFlag       bool
 	IgnoredCounter int `json:"-"`
@@ -76,6 +77,18 @@ type TestUser struct {
 	Email   string    `json:"email" jsonschema:"format=email"`
 }
 
+type myCustomContext struct {
+	CustomTitle string
+}
+
+type CustomString string
+
+func (c CustomString) CustomizeJSONSchema(schema *Type, customContext interface{}) {
+	if customContext != nil {
+		schema.Title = customContext.(myCustomContext).CustomTitle
+	}
+}
+
 type CustomTime time.Time
 
 type CustomTypeField struct {
@@ -89,10 +102,12 @@ func TestSchemaGeneration(t *testing.T) {
 		fixture   string
 	}{
 		{&TestUser{}, &Reflector{}, "fixtures/defaults.json"},
+		{&TestUser{}, &Reflector{SchemaContext: myCustomContext{CustomTitle: "Custom title"}}, "fixtures/custom_title.json"},
 		{&TestUser{}, &Reflector{AllowAdditionalProperties: true}, "fixtures/allow_additional_props.json"},
 		{&TestUser{}, &Reflector{RequiredFromJSONSchemaTags: true}, "fixtures/required_from_jsontags.json"},
 		{&TestUser{}, &Reflector{ExpandedStruct: true}, "fixtures/defaults_expanded_toplevel.json"},
 		{&TestUser{}, &Reflector{IgnoredTypes: []interface{}{GrandfatherType{}}}, "fixtures/ignore_type.json"},
+
 		{&CustomTypeField{}, &Reflector{
 			TypeMapper: func(i reflect.Type) *Type {
 				if i == reflect.TypeOf(CustomTime{}) {
