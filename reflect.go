@@ -361,7 +361,7 @@ func (t *Type) genericKeywords(tags []string) {
 	for _, tag := range tags {
 		nameValue := strings.Split(tag, "=")
 		if len(nameValue) == 2 {
-			name, val := nameValue[0], nameValue[1]
+			name, val := strings.TrimSpace(nameValue[0]), strings.TrimSpace(nameValue[1])
 			switch name {
 			case "title":
 				t.Title = val
